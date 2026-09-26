@@ -1,0 +1,134 @@
+services:
+  # ==========================================
+  # SERVIÇOS DE BACKEND (Iniciam Primeiro)
+  # ==========================================
+  inventory-service:
+    build:
+      context: ./inventory-service
+      target: development
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+    networks:
+      - internal-network
+    # [OPCIONAL DE OURO] Restrição estrita de recursos do container
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'     # Máximo de 50% de 1 núcleo de CPU
+          memory: 256M     # Máximo de 256 Megabytes de RAM
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    develop:
+      watch:
+        - action: sync
+          path: ./inventory-service
+          target: /usr/src/app
+          ignore:
+            - node_modules/
+
+  order-service:
+    build:
+      context: ./order-service
+      target: development
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+    networks:
+      - internal-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    develop:
+      watch:
+        - action: sync
+          path: ./order-service
+          target: /usr/src/app
+          ignore:
+            - node_modules/
+
+  product-service:
+    build:
+      context: ./product-service
+      target: development
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+    networks:
+      - internal-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    develop:
+      watch:
+        - action: sync
+          path: ./product-service
+          target: /usr/src/app
+          ignore:
+            - node_modules/
+
+  # ==========================================
+  # API GATEWAY (Inicia por Último)
+  # ==========================================
+  api-gateway:
+    build:
+      context: ./api-gateway
+      target: development
+    ports:
+      - "8080:3000" # Porta flexível exposta para o host
+    # [VARIÁVEIS DE AMBIENTE] URLs internas para comunicação direta via DNS do Docker
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - INVENTORY_SERVICE_URL=http://inventory-service:3000
+      - ORDER_SERVICE_URL=http://order-service:3000
+      - PRODUCT_SERVICE_URL=http://product-service:3000
+    networks:
+      - gateway-network
+      - internal-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'     # O Gateway ganha um pouco mais de CPU por centralizar o tráfego
+          memory: 384M
+    # [ORDENAÇÃO] Só inicia após o status saudável (healthy) dos três microsserviços
+    depends_on:
+      inventory-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./api-gateway
+          target: /usr/src/app
+          ignore:
+            - node_modules/
+
+# ==========================================
+# REDES DE COMUNICAÇÃO
+# ==========================================
+networks:
+  gateway-network:
+    driver: bridge
+  internal-network:
+    driver: bridge

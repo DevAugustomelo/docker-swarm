@@ -1,0 +1,41 @@
+# Dependências locais (nunca devem ser enviadas para o build do container)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Arquivos de ambiente locais e segredos
+.env
+.env.*
+!.env.example
+secrets/
+
+# Repositório de código e controle de versão
+.git/
+.gitignore
+.gitattributes
+
+# Configurações de IDEs e Editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Pastas de testes, cobertura e relatórios
+coverage/
+.nyc_output/
+.jest/
+*.test.js
+*.spec.js
+
+# Arquivos de sistema e logs gerais
+dist/
+build/
+.DS_Store
+Thumbs.db
+logs/
+*.log

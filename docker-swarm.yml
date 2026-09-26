@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # BANCO DE DADOS (Exclusivo no Manager)
+  # ==========================================
+  database:
+    image: postgres:16-alpine # Exemplo de imagem leve de banco
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: super_senha_segura
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - internal-network
+    deploy:
+      replicas: 1 # Conforme requisito: apenas 1 réplica
+      placement:
+        constraints:
+          - node.role == manager # Restrição estrita para rodar APENAS no Manager
+      restart_policy:
+        condition: on-failure
+
+  # ==========================================
+  # SERVIÇOS INTERNOS (3 Réplicas Cada)
+  # ==========================================
+  inventory-service:
+    image: seu-registro/inventory-service:latest # No Swarm, usamos imagens já buildadas
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://admin:super_senha_segura@database:5432/ecommerce
+    networks:
+      - internal-network
+    deploy:
+      replicas: 3 # Alta Disponibilidade
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+
+  order-service:
+    image: seu-registro/order-service:latest
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://admin:super_senha_segura@database:5432/ecommerce
+    networks:
+      - internal-network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+
+  product-service:
+    image: seu-registro/product-service:latest
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://admin:super_senha_segura@database:5432/ecommerce
+    networks:
+      - internal-network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+
+  # ==========================================
+  # API GATEWAY (2 Réplicas & Único Exposto)
+  # ==========================================
+  api-gateway:
+    image: seu-registro/api-gateway:latest
+    ports:
+      - "80:3000" # [SEGURANÇA] Único serviço com a chave 'ports' aberta publicamente
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - INVENTORY_SERVICE_URL=http://inventory-service:3000
+      - ORDER_SERVICE_URL=http://order-service:3000
+      - PRODUCT_SERVICE_URL=http://product-service:3000
+    networks:
+      - gateway-network
+      - internal-network
+    deploy:
+      replicas: 2 # Conforme requisito: 2 réplicas para o Gateway
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 384M
+      restart_policy:
+        condition: on-failure
+
+# ==========================================
+# REDES OVERLAY E VOLUMES
+# ==========================================
+networks:
+  gateway-network:
+    driver: overlay # Transforma em Overlay para o Swarm
+  internal-network:
+    external: true
+    name: internal-overlay # Vincula à rede criptografada que criamos via terminal
+
+volumes:
+  db-data:
+    driver: local # O volume persistirá localmente no disco do nó Manager
